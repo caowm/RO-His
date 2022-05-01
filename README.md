@@ -16,7 +16,7 @@
 1. 提供数据集成服务(IDEA)，类似Relativity Server，创建Schema后配置到idea.xml即可生成新数据服务，不需要修改后台代码。
 2. 以Schema为中心，前台所需配置都写在CustomAttributes里面，包括表格创建、窗体创建、控件属性、打印等等，很多时候只需要修改Schema即可完成界面的修改。
 3. 集成PaxCompile脚本扩展功能。脚本、窗体、函数都可以定义为一个功能点，相互之间通过Execute过程实现互动。
-4. 后台业务逻辑都写在SQLServer存储过程，在Schema里面配置CRUD绑定的存储过程。
+4. 后台业务逻辑都写在SQLServer存储过程，Schema里面的Command绑定存储过程，或者DataTable的Insert/Update/DeleteCommandName绑定存储过程。
 5. FastReport在后台生成报表传给前台，后台更新打印模板，前台即完成打印更新。
 6. 面向服务、多层架构、接口标准，这些都是因为Remobjects。
 7. base/auto update/提供软件升级功能。
