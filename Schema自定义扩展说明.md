@@ -517,13 +517,386 @@ begin
 end;
 
 ```
-这些重要的基础视图的创建都是基于DevExpress，窗体布局基于DevExpress Layout。这些控件既美观又好用，还能减少代码量。
+这些重要的基础视图的创建都是基于DevExpress强大的控件，窗体布局基于DevExpress Layout。这些控件既美观又好用，还能减少代码量。
+
+这些视图的创建最终都将调用下面两个重要的函数，用于完成各种控件properties的设定：
+
+```delphi
+procedure TDevExpressModule.BuildProperties(AColumn: TComponent;
+  EditProperties: TcxCustomEditProperties; DAField: TDAField;
+  DataSource: TDADataSource);
+begin
+  if EditProperties = nil then
+    Exit;
+  Assert(DAField <> nil);
+
+  BuildPropertiesProperty(EditProperties, DAField.CustomAttributes, DAField);
+
+  if Assigned(FOnWrapPropperties) then
+    FOnWrapPropperties(AColumn, EditProperties, DAField, DataSource);
+end;
+
+procedure TDevExpressModule.BuildPropertiesProperty(EditProperties
+  : TcxCustomEditProperties; CustomAttributes: TStrings; DAField: TDAField);
+var
+  List: TStringList;
+  J: Integer;
+  Attr: string;
+  FileImages: TFileImageList;
+
+  procedure BuildImageComboBoxItem(AItems: TcxImageComboBoxItems;
+    const AText: string; AImages: TFileImageList);
+  var
+    TextList: TStrings;
+  begin
+    TextList := TStringList.Create;
+    try
+      TextList.CommaText := AText;
+      with AItems.Add do
+      begin
+        if TextList.Count > 0 then
+          ImageIndex := AImages.IndexOf(TextList[0]);
+        if TextList.Count > 1 then
+          Description := TextList[1];
+        if TextList.Count > 2 then
+          Value := TextList[2];
+      end;
+    finally
+      TextList.Free;
+    end;
+  end;
+
+  procedure BuildEditButtonItem(AButtons: TcxEditButtons; AText: string;
+    AImages: TFileImageList);
+  var
+    TextList: TStrings;
+  begin
+    TextList := TStringList.Create;
+    try
+      TextList.CommaText := AText;
+      with AButtons.Add do
+      begin
+        Kind := bkText; // bkGlyph;  // 不能同时显示图标和文本???
+        if (TextList.Count > 0) and (AImages <> nil) then
+          ImageIndex := AImages.IndexOf(TextList[0]);
+        if TextList.Count > 1 then
+        begin
+          Caption := TextList[1];
+          Hint := Caption;
+        end;
+      end;
+    finally
+      TextList.Free;
+    end;
+  end;
+
+begin
+
+  EditProperties.ReadOnly := not StrToBoolDef
+    (CustomAttributes.Values['Options.Editing'], True);
+  EditProperties.ImmediatePost :=
+    StrToBoolDef(CustomAttributes.Values['Properties.ImmediatePost'], False);
+
+  // 设置输入法
+  if EditProperties.InheritsFrom(TcxCustomTextEditProperties) then
+  begin
+    with TcxCustomTextEditProperties(EditProperties) do
+    begin
+      Attr := CustomAttributes.Values['Properties.ImeMode'];
+      if Attr <> '' then
+      begin
+        ImeMode := TImeMode(GetEnumValue(TypeInfo(TImeMode), Attr));
+
+        if ImeMode = imOpen then
+          ImeName := FDefaultIME;
+      end;
+    end
+  end;
+
+  if EditProperties.InheritsFrom(TcxTextEditProperties) then
+    with TcxTextEditProperties(EditProperties) do
+    begin
+      Attr := CustomAttributes.Values['Properties.EchoMode'];
+      if Attr <> '' then
+        EchoMode := TcxEditEchoMode
+          (GetEnumValue(TypeInfo(TcxEditEchoMode), Attr));
+      Attr := CustomAttributes.Values['Properties.PasswordChar'];
+      if Length(Attr) > 0 then
+        PasswordChar := Attr[1];
+      // Attr := DAField.CustomAttributes.Values['Properties.CharCase'];
+      LookupItems.Delimiter := ';';
+      LookupItems.DelimitedText := CustomAttributes.Values
+        ['Properties.LookupItems'];
+    end
+  else if EditProperties.InheritsFrom(TcxCheckBoxProperties) then
+    with TcxCheckBoxProperties(EditProperties) do
+    begin
+      if DAField.DataType in [datInteger, datLargeInt, datByte, datShortInt,
+        datWord, datSmallInt, datCardinal, datLargeUInt] then
+      begin
+        // 设置数值型字段的布尔值
+        ValueChecked := 1;
+        ValueUnChecked := 0;
+      end
+    end
+  else if EditProperties.InheritsFrom(TcxCurrencyEditProperties) then
+    with TcxCurrencyEditProperties(EditProperties) do
+    begin
+      DisplayFormat := CustomAttributes.Values['Properties.DisplayFormat'];
+      if DisplayFormat = '' then
+        DisplayFormat := '0.00';
+      // DAField.DisplayFormat; Schema中直接设置DisplayFormat后，字段显示不正常
+      EditFormat := DisplayFormat;
+      DecimalPlaces :=
+        StrToIntDef(CustomAttributes.Values['Properties.DecimalPlaces'], 2);
+      Attr := CustomAttributes.Values['Properties.MaxValue'];
+      if Attr <> '' then
+        MaxValue := StrToIntDef(Attr, 0);
+      Attr := CustomAttributes.Values['Properties.MinValue'];
+      if Attr <> '' then
+        MinValue := StrToIntDef(Attr, 0);
+    end
+  else if EditProperties.InheritsFrom(TcxImageComboBoxProperties) then
+    with TcxImageComboBoxProperties(EditProperties), CustomAttributes do
+    begin
+      Items.Clear;
+      ShowDescriptions :=
+        StrToBoolDef(Values['Properties.ShowDescriptions'], True);
+      {
+        Properties.Images.Width=24
+        Properties.Images.Height=16
+        Properties.Items=ImageName, Description, Value; ImageName, Description, Value;...
+      }
+      {
+        FileImages := TFileImageList.Create(Column, AppCore.ImagePath, '', sDefaultImageName,
+        StrToIntDef(Values['Properties.Images.Width'], 16),
+        StrToIntDef(Values['Properties.Images.Height'], 16));
+      }
+      FileImages := AppCore.SmallImage;
+
+      Images := FileImages.ImageList;
+      List := TStringList.Create;
+      try
+        List.Delimiter := ';';
+        List.DelimitedText := Values['Properties.ImageItems'];
+        while List.Count > 0 do
+        begin
+          BuildImageComboBoxItem(Items, List[0], FileImages);
+          List.Delete(0);
+        end;
+      finally
+        List.Free;
+      end;
+    end
+  else if EditProperties.InheritsFrom(TcxDateEditProperties) then
+    with TcxDateEditProperties(EditProperties), CustomAttributes do
+    begin
+      SaveTime := StrToBoolDef(Values['Properties.SaveTime'], False);
+      ShowTime := SaveTime;
+      if SaveTime then
+      begin
+        // InputKind :=
+        Kind := ckDateTime;
+      end;
+    end
+  else if EditProperties.InheritsFrom(TcxPopupEditProperties) then
+    with TcxPopupEditProperties(EditProperties) do
+    begin
+      // PopupClientEdge := True;
+      // ReadOnly := True;  // 防止清除数据，但显示为灰色
+    end
+  else if EditProperties.InheritsFrom(TcxComboBoxProperties) then
+    with TcxComboBoxProperties(EditProperties) do
+    begin
+      ImmediateDropDownWhenActivated := True;
+      Items.Delimiter := ';';
+      Items.DelimitedText := CustomAttributes.Values['Properties.Items'];
+      Attr := CustomAttributes.Values['Properties.DropDownListStyle'];
+      if Attr <> '' then
+        DropDownListStyle := TcxEditDropDownListStyle
+          (GetEnumValue(TypeInfo(TcxEditDropDownListStyle), Attr));
+    end
+  else if EditProperties.InheritsFrom(TcxLookupComboBoxProperties) then
+    with TcxLookupComboBoxProperties(EditProperties) do
+    begin
+      DropDownAutoSize := True;
+      DropDownSizeable := True;
+      // ImmediateDropDownWhenActivated := True;
+      ListFieldNames := CustomAttributes.Values['Properties.ListFieldNames'];
+      ListFieldIndex :=
+        StrToIntDef(CustomAttributes.Values['Properties.ListFieldIndex'], 0);
+      if Assigned(FOnGetLookupSource) then
+      begin
+        if Assigned(FOnGetLookupSource) then
+        begin
+          ListSource := FOnGetLookupSource
+            (CustomAttributes.Values['Properties.ListSource']);
+          if ListSource <> nil then
+            KeyFieldNames := TDADataSource(ListSource)
+              .DataTable.CustomAttributes.Values['KeyFieldNames'];
+        end;
+      end;
+    end
+  else if EditProperties.InheritsFrom(TcxButtonEditProperties) then
+    with TcxButtonEditProperties(EditProperties), CustomAttributes do
+    begin
+      Attr := CustomAttributes.Values['Properties.ViewStyle'];
+      if Attr <> '' then
+        ViewStyle := TcxTextEditViewStyle
+          (GetEnumValue(TypeInfo(TcxTextEditViewStyle), Attr));
+
+      {
+        FileImages := TFileImageList.Create(Column, AppCore.ImagePath, '', sDefaultImageName,
+        StrToIntDef(Values['Properties.Images.Width'], 16),
+        StrToIntDef(Values['Properties.Images.Height'], 16));
+      }
+      FileImages := AppCore.SmallImage;
+
+      Images := FileImages.ImageList;
+
+      List := TStringList.Create;
+      try
+        List.Delimiter := ';';
+        List.DelimitedText := Values['Properties.Buttons'];
+        Buttons.Clear;
+        while List.Count > 0 do
+        begin
+          BuildEditButtonItem(Buttons, List[0], FileImages);
+          List.Delete(0);
+        end;
+      finally
+        List.Free;
+      end;
+    end
+  else if EditProperties.InheritsFrom(TcxHyperLinkEditProperties) then
+    with TcxHyperLinkEditProperties(EditProperties), CustomAttributes do
+    begin
+      SingleClick := True;
+    end
+  else if EditProperties.InheritsFrom(TcxMaskEditProperties) then
+    with TcxMaskEditProperties(EditProperties) do
+    begin
+      MaskKind := emkRegExprEx;
+      EditMask := CustomAttributes.Values['Properties.EditMask'];
+    end
+  else if EditProperties.InheritsFrom(TcxCalcEditProperties) then
+    with TcxCalcEditProperties(EditProperties) do
+    begin
+      DisplayFormat := CustomAttributes.Values['Properties.DisplayFormat'];
+    end
+  else if EditProperties.InheritsFrom(TcxSpinEditProperties) then
+    with TcxSpinEditProperties(EditProperties) do
+    begin
+      // if DAField.DataType in [datFloat, datCurrency, datDecimal, datSingleFloat] then
+      ValueType := vtFloat;
+      // else
+      // ValueType := vtInt;
+      DisplayFormat := CustomAttributes.Values['Properties.DisplayFormat'];
+      // if DisplayFormat = '' then DisplayFormat := '0.00';
+      EditFormat := DisplayFormat;
+      Attr := CustomAttributes.Values['Properties.MaxValue'];
+      if Attr <> '' then
+        MaxValue := StrToIntDef(Attr, 0);
+      Attr := CustomAttributes.Values['Properties.MinValue'];
+      if Attr <> '' then
+        MinValue := StrToIntDef(Attr, 0);
+    end
+  else if EditProperties.InheritsFrom(TcxMemoProperties) then
+    with TcxMemoProperties(EditProperties) do
+    begin
+      VisibleLineCount := 0;
+      Attr := CustomAttributes.Values['Properties.VisibleLineCount'];
+      if Attr <> '' then
+        VisibleLineCount := StrToIntDef(Attr, 2);
+      Attr := CustomAttributes.Values['Properties.ScrollBars'];
+      if Attr <> '' then
+        ScrollBars := TcxScrollStyle
+          (GetEnumValue(TypeInfo(TcxScrollStyle), Attr))
+      else
+        ScrollBars := ssVertical;
+    end
+  else if EditProperties.InheritsFrom(TcxCheckComboBoxProperties) then
+    with TcxCheckComboBoxProperties(EditProperties) do
+    begin
+      Items.Clear;
+      List := TStringList.Create;
+      try
+        List.Delimiter := ';';
+        List.DelimitedText := CustomAttributes.Values['Properties.Items'];
+        for J := 0 to List.Count - 1 do
+          Items.AddCheckItem(List[J]);
+      finally
+        FreeAndNil(List);
+      end;
+    end
+  else if EditProperties.InheritsFrom(TcxCheckGroupProperties) then
+    with TcxCheckGroupProperties(EditProperties) do
+    begin
+      Items.Clear;
+      Columns := StrToIntDef(CustomAttributes.Values['Properties.Columns'], 1);
+      EditValueFormat := cvfInteger; // 此种格式最方便
+      List := TStringList.Create;
+      try
+        List.Delimiter := ';';
+        List.DelimitedText := CustomAttributes.Values['Properties.Items'];
+        for J := 0 to List.Count - 1 do
+          Items.Add.Caption := List[J];
+      finally
+        FreeAndNil(List);
+      end;
+    end
+  else if EditProperties.InheritsFrom(TcxRadioGroupProperties) then
+    with TcxRadioGroupProperties(EditProperties) do
+    begin
+      Items.Clear;
+      Columns := StrToIntDef(CustomAttributes.Values['Properties.Columns'], 1);
+      List := TStringList.Create;
+      try
+        List.Delimiter := ';';
+        List.DelimitedText := CustomAttributes.Values['Properties.Items'];
+        for J := 0 to List.Count - 1 do
+          with Items.Add do
+          begin
+            Caption := List.Text[J];
+            Value := List.ValueFromIndex[J];
+          end;
+      finally
+        FreeAndNil(List);
+      end;
+    end
+  else if EditProperties.InheritsFrom(TcxImageProperties) then
+    with TcxImageProperties(EditProperties) do
+    begin
+      GraphicClassName := 'TdxSmartImage';
+    end;
+end;
+
+```
+
+这里精彩的地方是如何把Schema里面的CustomAttributes一步步传递到DevExpress控件的TcxCustomEditProperties。
+
+〉请大家注意，上面的代码对TcxPopupEditProperties我们没有设置任何属性。这个弹出式编辑框要展示的内容(其他控件或窗体)，由TPopupEditorWrapper通过DevExpress.OnWrapProperties事件接管。TPopupEditorWrapper是个包装类，这种模式不修改源码，并且可组合多个第3方组件，扩展功能的同时，提高了代码复用，可维护性也有保障。整个框架有几处应用这种模式！
+
+```delphi
+constructor TPopupEditorWrapper.Create(AOwner: TComponent);
+begin
+  inherited;
+  // 其他Wrapper都要记下这个属性，以便传递事件
+  FOldOnWrapProperties := DevExpress.OnWrapProperties;
+  DevExpress.OnWrapProperties := WrapProperites;
+  FRegisteredEditor := TStringList.Create;
+  FCreatedEditor := TStringList.Create;
+  RegisterPopupEditor(sPopupViewName_DictIME, TDictIMEDialog);     // 字典输入方式
+  RegisterPopupEditor(sPopupViewName_AgeIME, TAgeIMEDialog);
+end;
+```
+
 
 下面查看HisService_Clinic.daSchema里面的Clin_Reg_Help，该DataTable用于创建挂号视图。DataTable CustomAttributes：
 ```yaml
-DefaultBeginsLayer=False
-FormControlWidth=200
-FormImageName=misc\clin_reg.png
+DefaultBeginsLayer=False                  #布局是否开始新层
+FormControlWidth=200                      #控件默认宽度
+FormImageName=misc\clin_reg.png           
 ```
 
 字段 OfficeName CustomAttributes：
@@ -531,19 +904,19 @@ FormImageName=misc\clin_reg.png
 BeginsLayer=True
 Properties.IMEMode=imClose
 Style.Font.Size=20
-Properties=PopupEdit
-IME.DictName=Sys_ClinicOffice
-IME.GetValueField=OfficeID;OfficeName
-IME.SetValueField=OfficeID;OfficeName
+Properties=PopupEdit                      #使用弹出式编辑框                
+IME.DictName=Sys_ClinicOffice             #弹出框展示门诊科室字典
+IME.GetValueField=OfficeID;OfficeName     #赋值时取字典的两个字段OfficeID和OfficeName
+IME.SetValueField=OfficeID;OfficeName     #赋值到目标DataTable的两个字段OfficeID和OfficeName 
 ```
 
 字段DiagPrice CustomAttributes：
 ```yaml
-Options.Editing=False
+Options.Editing=False                     #是否可编辑
 Style.Font.Size=20
-Properties=CurrencyEdit
-Properties.DecimalPlaces=2
-Properties.DisplayFormat=0.00
+Properties=CurrencyEdit                   #使用CurrencyEdit控件
+Properties.DecimalPlaces=2                #保留两位小数
+Properties.DisplayFormat=0.00             #显示格式
 ```
 
 最后我们可以检查 ***doc/Schema自定义属性说明.xls*** 文件，看看哪些地方可以设置哪些属性。
