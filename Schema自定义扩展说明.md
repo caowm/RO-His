@@ -875,7 +875,7 @@ end;
 
 这里精彩的地方是如何把Schema里面的CustomAttributes一步步传递到DevExpress控件的TcxCustomEditProperties。
 
-〉请大家注意，上面的代码对TcxPopupEditProperties我们没有设置任何属性。这个弹出式编辑框要展示的内容(其他控件或窗体)，由TPopupEditorWrapper通过DevExpress.OnWrapProperties事件接管。TPopupEditorWrapper是个包装类，这种模式不修改源码，并且可组合多个第3方组件，扩展功能的同时，提高了代码复用，可维护性也有保障。整个框架有几处应用这种模式！
+> 请大家注意，上面的代码对TcxPopupEditProperties我们没有设置任何属性。这个弹出式编辑框要展示的内容(其他控件或窗体)，由TPopupEditorWrapper通过DevExpress.OnWrapProperties事件接管。TPopupEditorWrapper是个包装类，这种模式不修改源码，并且可组合多个第3方组件，扩展功能的同时，提高了代码复用，可维护性也有保障。整个框架有几个地方应用这种模式，我们将专门讨论这种设计模式。
 
 ```delphi
 constructor TPopupEditorWrapper.Create(AOwner: TComponent);
@@ -886,9 +886,14 @@ begin
   DevExpress.OnWrapProperties := WrapProperites;
   FRegisteredEditor := TStringList.Create;
   FCreatedEditor := TStringList.Create;
-  RegisterPopupEditor(sPopupViewName_DictIME, TDictIMEDialog);     // 字典输入方式
+  RegisterPopupEditor(sPopupViewName_DictIME, TDictIMEDialog);     // 注册字典输入
   RegisterPopupEditor(sPopupViewName_AgeIME, TAgeIMEDialog);
 end;
+
+
+initialization
+PopupEditorWrapper := TPopupEditorWrapper.Create(nil);
+
 ```
 
 
