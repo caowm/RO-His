@@ -899,16 +899,16 @@ PopupEditorWrapper := TPopupEditorWrapper.Create(nil);
 
 下面查看HisService_Clinic.daSchema里面的Clin_Reg_Help，该DataTable用于创建挂号视图。DataTable CustomAttributes：
 ```yaml
-DefaultBeginsLayer=False                  #布局是否开始新层
+DefaultBeginsLayer=False                  #True表示垂直布局，False表示先横向布局，配合BeingsLayer换行
 FormControlWidth=200                      #控件默认宽度
-FormImageName=misc\clin_reg.png           
+FormImageName=misc\clin_reg.png           #窗体图片
 ```
 
 字段 OfficeName CustomAttributes：
 ```yaml
-BeginsLayer=True
-Properties.IMEMode=imClose
-Style.Font.Size=20
+BeginsLayer=True                          #此控件布局换行
+Properties.IMEMode=imClose                #关闭输入法
+Style.Font.Size=20                        #控件字体大小
 Properties=PopupEdit                      #使用弹出式编辑框                
 IME.DictName=Sys_ClinicOffice             #弹出框展示门诊科室字典
 IME.GetValueField=OfficeID;OfficeName     #赋值时取字典的两个字段OfficeID和OfficeName
@@ -918,7 +918,7 @@ IME.SetValueField=OfficeID;OfficeName     #赋值到目标DataTable的两个字�
 字段DiagPrice CustomAttributes：
 ```yaml
 Options.Editing=False                     #是否可编辑
-Style.Font.Size=20
+Style.Font.Size=20                        #控件字体大小
 Properties=CurrencyEdit                   #使用CurrencyEdit控件
 Properties.DecimalPlaces=2                #保留两位小数
 Properties.DisplayFormat=0.00             #显示格式
