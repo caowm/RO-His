@@ -28,14 +28,14 @@ unit HisClient_Organizer;
 
 uses
   App_PaxCompiler,
-  IMPORT_App_Function,           <----------
-  Import_App_Common,            <----------
-  IMPORT_App_DAModel,         <----------
-  IMPORT_App_DAView,            <----------
-  Import_App_DevExpress,        <----------
-  Import_App_Class,                  <----------
-  Import_App_FastReport,         <----------
-  IMPORT_dxLayoutContainer,  <----------
+  IMPORT_App_Function,   <----------
+  Import_App_Common,
+  IMPORT_App_DAModel,
+  IMPORT_App_DAView,
+  Import_App_DevExpress,
+  Import_App_Class,
+  Import_App_FastReport,
+  IMPORT_dxLayoutContainer,   <----------
   
 constructor THisClientOrganizer.Create(AOwner: TComponent);
 begin
@@ -184,7 +184,7 @@ var
 
 ```
 
-- 看看其中一个收入统计脚本(Scriptd=pas_stat_hosp_fee_office)：
+- 看看其中一个收入统计脚本(ScriptID=pas_stat_hosp_fee_office)：
 
 ```delphi
 uses Classes, Forms, SysUtils, uDAWhere, App_Common, App_DAModel, App_DAView;
@@ -247,7 +247,7 @@ end.
 
 - 只要知道OperationID，通过TOperations.SearchOperation可找到任何一个TBaseOperation，这样任何一个TBaseOperation都可以调用其他TBaseOperation，这就是客户端各部分之间交互通讯机制。
 
-- 用户登录之后会执行带有iOperationFlag_Start标志TBaseOperation
+- 用户登录之后会执行带有iOperationFlag_Start标志的TBaseOperation
 
 ```delphi
 procedure TAppCore.DoOnReady(Sender: TObject);
